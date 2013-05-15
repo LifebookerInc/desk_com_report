@@ -11,11 +11,16 @@ Gem::Specification.new do |s|
   s.description = "Generates a CSV for Concierge"
 
   
-  s.add_runtime_dependency("trollop")
-  s.add_runtime_dependency("chronic")
-  s.add_runtime_dependency("rest-client")
-  
-  s.required_rubygems_version = ">= 1.3.6"
+  s.add_dependency("trollop")
+  s.add_dependency("chronic")
+  s.add_dependency("rest-client")
+  s.add_dependency("json_pure")
+
+  if RUBY_VERSION.to_f < 1.9
+    s.add_dependency("fastercsv")
+  end
+
+
   s.bindir       = "bin"
   s.files        = Dir.glob("**/*")
   s.executables  = Dir.glob("bin/*").collect{|f| File.basename(f)}

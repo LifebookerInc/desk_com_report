@@ -1,8 +1,14 @@
 require 'restclient'
-require 'csv'
 require 'chronic'
 require 'trollop'
 require 'json'
+
+if RUBY_VERSION.to_f < 1.9
+  require 'fastercsv'
+  CSV = FCSV
+else
+  require 'csv'
+end
 
 class DeskComReport
 
@@ -29,12 +35,12 @@ class DeskComReport
   end
 
   def get_field_names(line)
-    names = line.select{|k,v| !v.is_a?(Hash)}.keys
+    names = line.dup.delete_if{|k,v| v.is_a?(Hash)}.keys
     names += line["custom_fields"].keys
   end
 
   def get_field_values(line)
-    values = line.select{|k,v| !v.is_a?(Hash)}.values
+    values = line.dup.delete_if{|k,v| v.is_a?(Hash)}.values
     values += line["custom_fields"].values
     # convert arrays to ;-delimited string
     values.collect{|v| v.is_a?(Array) ? v.join("; ") : v}
