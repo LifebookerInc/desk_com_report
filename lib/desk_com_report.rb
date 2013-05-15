@@ -34,6 +34,17 @@ class DeskComReport
     )
   end
 
+  def fetch_data(page = 1)
+    req = RestClient::Request.new(
+      :url => "https://lifebooker.desk.com/api/v2/cases/search?since_created_at=#{self.since.to_i}&page=#{page}&per_page=100",
+      :user => self.user,
+      :password => self.password,
+      :method => :get,
+      :headers => { :accept => :json, :content_type => :json }
+    )
+    JSON.parse(req.execute)
+  end
+
   def get_field_names(line)
     names = line.dup.delete_if{|k,v| v.is_a?(Hash)}.keys
     names += line["custom_fields"].keys
@@ -48,8 +59,8 @@ class DeskComReport
 
   def generate_csv_string
     CSV.generate do |csv|
-      csv << self.get_field_names(@data["_embedded"]["entries"].first)
-      @data["_embedded"]["entries"].each do |line|
+      csv << self.get_field_names(@data.first)
+      @data.each do |line|
         csv << self.get_field_values(line)
       end
     end
@@ -57,14 +68,18 @@ class DeskComReport
 
   def get_data
     @data ||= begin
-      req = RestClient::Request.new(
-        :url => "https://lifebooker.desk.com/api/v2/cases/search?since_created_at=#{self.since.to_i}",
-        :user => self.user,
-        :password => self.password,
-        :method => :get,
-        :headers => { :accept => :json, :content_type => :json }
-      )
-      JSON.parse(req.execute)
+      puts "Fetching data since #{self.since.strftime("%m/%d/%Y %H:%M:%S %Z")}"
+      first_response = self.fetch_data
+      total = first_response["total_entries"]
+      pages = (total / 100.0).ceil
+
+      res = first_response["_embedded"]["entries"]
+      (2..pages).each do |page|
+        puts "Fetching page #{page} of #{pages}"
+        res += self.fetch_data(page)["_embedded"]["entries"]
+      end
+
+      res
     end
   end
 
