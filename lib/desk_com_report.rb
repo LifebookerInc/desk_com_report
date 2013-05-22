@@ -130,23 +130,3 @@ class DeskComReport
   end
 
 end
-
-
-opts = Trollop::options do
-  opt :since, 
-    "Cases Since",
-    :type => :string, 
-    # default to one week ago
-    :default => "#{(Time.now - (7 * 24 * 60 * 60)).strftime("%Y-%m-%d")}"
-  opt :user,
-    "Desk.com username",
-    :type => :string,
-    :required => true
-  opt :password,
-    "Desk.com password",
-    :type => :string,
-    :required => true
-end
-
-
-DeskComReport.new(opts).run
