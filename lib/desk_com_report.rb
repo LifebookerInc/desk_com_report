@@ -1,3 +1,5 @@
+require 'rubygems'
+
 require 'restclient'
 require 'chronic'
 require 'trollop'
@@ -11,6 +13,8 @@ else
 end
 
 class DeskComReport
+
+  ENDPOINT = "https://lifebooker.desk.com"
 
   def initialize(opts)
     @opts = opts
@@ -35,26 +39,40 @@ class DeskComReport
   end
 
   def fetch_data(page = 1)
-    req = RestClient::Request.new(
-      :url => "https://lifebooker.desk.com/api/v2/cases/search?since_created_at=#{self.since.to_i}&page=#{page}&per_page=100",
-      :user => self.user,
-      :password => self.password,
-      :method => :get,
-      :headers => { :accept => :json, :content_type => :json }
+    make_request(
+      :url => "#{ENDPOINT}/api/v2/cases/search?since_created_at=#{self.since.to_i}&page=#{page}"
     )
-    JSON.parse(req.execute)
   end
 
   def get_field_names(line)
     names = line.dup.delete_if{|k,v| v.is_a?(Hash)}.keys
     names += line["custom_fields"].keys
+    names << "Assigned User"
   end
 
   def get_field_values(line)
     values = line.dup.delete_if{|k,v| v.is_a?(Hash)}.values
     values += line["custom_fields"].values
+    values << self.get_user_name(line)
     # convert arrays to ;-delimited string
-    values.collect{|v| v.is_a?(Array) ? v.join("; ") : v}
+    values = values.collect{|v| v.is_a?(Array) ? v.join("; ") : v}
+    values = values.collect{|v| v.to_s.gsub(/[;\|]/,";")}
+    values
+  end
+
+  # fetch the user's name based on his href
+  def get_user_name(line)
+
+    if line["_links"]["assigned_user"].is_a?(Hash)
+      href = line["_links"]["assigned_user"]["href"]
+    else
+      return "Not Assigned"
+    end
+
+    @map ||= {}
+    @map[href] ||= begin
+      self.make_request(:url => "#{ENDPOINT}#{href}")["name"]
+    end
   end
 
   def generate_csv_string
@@ -83,6 +101,16 @@ class DeskComReport
     end
   end
 
+  def make_request(opts)
+    req = RestClient::Request.new(opts.merge(
+      :user => self.user,
+      :password => self.password,
+      :method => :get,
+      :headers => { :accept => :json, :content_type => :json }
+    ))
+    JSON.parse(req.execute)
+  end
+
   def password
     @opts[:password]
   end
@@ -102,3 +130,23 @@ class DeskComReport
   end
 
 end
+
+
+opts = Trollop::options do
+  opt :since, 
+    "Cases Since",
+    :type => :string, 
+    # default to one week ago
+    :default => "#{(Time.now - (7 * 24 * 60 * 60)).strftime("%Y-%m-%d")}"
+  opt :user,
+    "Desk.com username",
+    :type => :string,
+    :required => true
+  opt :password,
+    "Desk.com password",
+    :type => :string,
+    :required => true
+end
+
+
+DeskComReport.new(opts).run
